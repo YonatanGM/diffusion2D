@@ -5,10 +5,8 @@ Example acquired from https://scipython.com/book/chapter-7-matplotlib/examples/t
 """
 
 import numpy as np
-import matplotlib
-matplotlib.use('TkAgg')  # Set the interactive backend
 import matplotlib.pyplot as plt  # Import pyplot AFTER setting the backend
-from output import create_plot, output_plots
+from .output import create_plot, output_plots
 
 # solve the 2D diffusion equation
 def solve(dx=0.1, dy=0.1, D=4.0):
