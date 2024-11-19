@@ -69,4 +69,3 @@ def solve(dx=0.1, dy=0.1, D=4.0):
     # Plot output figures
     output_plots(fig, im, T_cold, T_hot)
 
-solve()
