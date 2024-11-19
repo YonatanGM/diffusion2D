@@ -5,77 +5,68 @@ Example acquired from https://scipython.com/book/chapter-7-matplotlib/examples/t
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')  # Set the interactive backend
+import matplotlib.pyplot as plt  # Import pyplot AFTER setting the backend
+from output import create_plot, output_plots
 
-# plate size, mm
-w = h = 10.
-# intervals in x-, y- directions, mm
-dx = dy = 0.1
-# Thermal diffusivity of steel, mm^2/s
-D = 4.
+# solve the 2D diffusion equation
+def solve(dx=0.1, dy=0.1, D=4.0):
+    # plate size, mm
+    w = h = 10.
+    # Thermal diffusivity of steel, mm^2/s
+    T_cold = 300  # Initial cold temperature of square domain
+    T_hot = 700   # Initial hot temperature of circular disc at the center
 
-# Initial cold temperature of square domain
-T_cold = 300
+    # Number of discrete mesh points in X and Y directions
+    nx, ny = int(w / dx), int(h / dy)
 
-# Initial hot temperature of circular disc at the center
-T_hot = 700
+    # Computing a stable time step
+    dx2, dy2 = dx * dx, dy * dy
+    dt = dx2 * dy2 / (2 * D * (dx2 + dy2))
 
-# Number of discrete mesh points in X and Y directions
-nx, ny = int(w / dx), int(h / dy)
+    print("dt = {}".format(dt))
 
-# Computing a stable time step
-dx2, dy2 = dx * dx, dy * dy
-dt = dx2 * dy2 / (2 * D * (dx2 + dy2))
+    u0 = T_cold * np.ones((nx, ny))
+    u = u0.copy()
 
-print("dt = {}".format(dt))
+    # Initial conditions - circle of radius r centred at (cx,cy) (mm)
+    r = min(h, w) / 4.0
+    cx = w / 2.0
+    cy = h / 2.0
+    r2 = r ** 2
+    for i in range(nx):
+        for j in range(ny):
+            p2 = (i * dx - cx) ** 2 + (j * dy - cy) ** 2
+            if p2 < r2:
+                u0[i, j] = T_hot
 
-u0 = T_cold * np.ones((nx, ny))
-u = u0.copy()
+    # propagate with forward-difference in time, central-difference in space
+    def do_timestep(u_nm1, u):
+        u[1:-1, 1:-1] = u_nm1[1:-1, 1:-1] + D * dt * (
+                (u_nm1[2:, 1:-1] - 2 * u_nm1[1:-1, 1:-1] + u_nm1[:-2, 1:-1]) / dx2
+                + (u_nm1[1:-1, 2:] - 2 * u_nm1[1:-1, 1:-1] + u_nm1[1:-1, :-2]) / dy2)
 
-# Initial conditions - circle of radius r centred at (cx,cy) (mm)
-r = min(h, w) / 4.0
-cx = w / 2.0
-cy = h / 2.0
-r2 = r ** 2
-for i in range(nx):
-    for j in range(ny):
-        p2 = (i * dx - cx) ** 2 + (j * dy - cy) ** 2
-        if p2 < r2:
-            u0[i, j] = T_hot
+        u_nm1 = u.copy()
+        return u_nm1, u
 
+    # Number of timesteps
+    nsteps = 101
+    # Output 4 figures at these timesteps
+    n_output = [0, 10, 50, 100]
+    fig_counter = 0
+    fig = plt.figure()
 
-def do_timestep(u_nm1, u, D, dt, dx2, dy2):
-    # Propagate with forward-difference in time, central-difference in space
-    u[1:-1, 1:-1] = u_nm1[1:-1, 1:-1] + D * dt * (
-            (u_nm1[2:, 1:-1] - 2 * u_nm1[1:-1, 1:-1] + u_nm1[:-2, 1:-1]) / dx2
-            + (u_nm1[1:-1, 2:] - 2 * u_nm1[1:-1, 1:-1] + u_nm1[1:-1, :-2]) / dy2)
+    # Time loop
+    for n in range(nsteps):
+        u0, u = do_timestep(u0, u)
 
-    u_nm1 = u.copy()
-    return u_nm1, u
+        # Create figure
+        if n in n_output:
+            fig_counter += 1
+            im = create_plot(fig, u.copy(), n, dt, T_cold, T_hot, fig_counter)
 
+    # Plot output figures
+    output_plots(fig, im, T_cold, T_hot)
 
-# Number of timesteps
-nsteps = 101
-# Output 4 figures at these timesteps
-n_output = [0, 10, 50, 100]
-fig_counter = 0
-fig = plt.figure()
-
-# Time loop
-for n in range(nsteps):
-    u0, u = do_timestep(u0, u, D, dt, dx2, dy2)
-
-    # Create figure
-    if n in n_output:
-        fig_counter += 1
-        ax = fig.add_subplot(220 + fig_counter)
-        im = ax.imshow(u.copy(), cmap=plt.get_cmap('hot'), vmin=T_cold, vmax=T_hot)  # image for color bar axes
-        ax.set_axis_off()
-        ax.set_title('{:.1f} ms'.format(n * dt * 1000))
-
-# Plot output figures
-fig.subplots_adjust(right=0.85)
-cbar_ax = fig.add_axes([0.9, 0.15, 0.03, 0.7])
-cbar_ax.set_xlabel('$T$ / K', labelpad=20)
-fig.colorbar(im, cax=cbar_ax)
-plt.show()
+solve()
